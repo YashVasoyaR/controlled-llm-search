@@ -9,21 +9,21 @@ const client = new OpenAI({
 export async function POST(req) {
   const { query } = await req.json();
 
-  // 🔥 Step 1: Convert query → structured JSON
+  // 🔥 STEP 1: LLM → Extract filters
   const aiResponse = await client.chat.completions.create({
     model: "openai/gpt-3.5-turbo",
     messages: [
       {
         role: "system",
         content: `
-  Extract structured filters from user query.
-  
-  Return ONLY JSON:
-  {
-    "location": string | null,
-    "maxPrice": number | null,
-    "amenities": string[]
-  }
+Extract structured filters from user query.
+
+Return ONLY JSON:
+{
+  "location": string | null,
+  "maxPrice": number | null,
+  "amenities": string[]
+}
         `,
       },
       {
@@ -34,17 +34,16 @@ export async function POST(req) {
   });
 
   const raw = aiResponse.choices[0].message.content;
-  console.log("AI:", raw);
 
   let filters;
-  console.log("aiResponse", aiResponse);
   try {
-    filters = JSON.parse(aiResponse.choices[0].message.content);
+    const clean = raw.replace(/```json|```/g, "").trim();
+    filters = JSON.parse(clean);
   } catch (e) {
-    return Response.json({ error: "Invalid AI response" });
+    return Response.json({ error: "Invalid AI response", raw });
   }
 
-  // 🔥 Step 2: Apply filters
+  // 🔥 STEP 2: Backend filtering
   const results = hotels.filter((hotel) => {
     if (filters.location && hotel.location !== filters.location) {
       return false;
@@ -64,9 +63,44 @@ export async function POST(req) {
     return true;
   });
 
+  // 🔥 STEP 3: LLM → Format final response (IMPORTANT)
+  const finalResponse = await client.chat.completions.create({
+    model: "openai/gpt-3.5-turbo",
+    messages: [
+      {
+        role: "system",
+        content: "Provide a helpful, short response recommending hotels.",
+      },
+      {
+        role: "user",
+        content: `
+User query: ${query}
+
+Available hotels:
+${JSON.stringify(results)}
+        `,
+      },
+    ],
+  });
+
+  const finalAnswer = finalResponse.choices[0].message.content;
+
+  // 🔥 Metrics (your differentiator)
+  const fullData = JSON.stringify(hotels);
+  const filteredData = JSON.stringify(results);
+
+  const fullSize = fullData.length;
+  const filteredSize = filteredData.length;
+
   return Response.json({
     query,
     filters,
     results,
+    finalAnswer,
+    metrics: {
+      fullDataSize: fullSize,
+      filteredDataSize: filteredSize,
+      reduction: `${Math.round(((fullSize - filteredSize) / fullSize) * 100)}%`,
+    },
   });
 }
