@@ -25,6 +25,7 @@ interface ApiResponse {
     title?: string;
     price?: number;
     rate?: number;
+    currency?: string;
   }>;
   usage: UsageData;
   latency: LatencyData;
@@ -41,6 +42,14 @@ export default function SearchDemo() {
   const [baseline, setBaseline] = useState<ApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const isCached = optimized?.cached === true;
+
+  const formatCurrency = (amount: number, currency = "INR") => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency,
+    }).format(amount);
+  }
   const handleSearch = async () => {
     if (!query.trim()) {
       setError("Please enter a search query");
@@ -76,7 +85,7 @@ export default function SearchDemo() {
       setBaseline(baselineData);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "An error occurred during search"
+        err instanceof Error ? err.message : "An error occurred during search",
       );
       setOptimized(null);
       setBaseline(null);
@@ -89,20 +98,32 @@ export default function SearchDemo() {
     if (!baseline || !optimized) return null;
 
     const baselineTokens =
-      baseline.usage?.fullContextProcessingTokens || baseline.usage?.totalTokens || 0;
+      baseline.usage?.fullContextProcessingTokens ||
+      baseline.usage?.totalTokens ||
+      0;
     const optimizedTokens = optimized.usage?.totalTokens || 0;
     const tokenReduction = baselineTokens
       ? (((baselineTokens - optimizedTokens) / baselineTokens) * 100).toFixed(1)
       : 0;
 
     const baselineLatency =
-      baseline.latency?.fullContextProcessingMs || baseline.latency?.totalMs || 0;
+      baseline.latency?.fullContextProcessingMs ||
+      baseline.latency?.totalMs ||
+      0;
     const optimizedLatency = optimized.latency?.totalMs || 0;
-    const latencyImprovement = baselineLatency
-      ? (((baselineLatency - optimizedLatency) / baselineLatency) * 100).toFixed(1)
-      : 0;
+    let latencyImprovement = 0;
 
-    return { tokenReduction, latencyImprovement };
+    if (baselineLatency) {
+      latencyImprovement =
+        ((baselineLatency - optimizedLatency) / baselineLatency) * 100;
+    }
+
+    const latencyLabel =
+      latencyImprovement >= 0
+        ? `${latencyImprovement.toFixed(1)}% faster`
+        : `${Math.abs(latencyImprovement).toFixed(1)}% slower`;
+
+    return { tokenReduction, latencyImprovement, latencyLabel };
   };
 
   const improvement = calculateImprovement();
@@ -155,13 +176,11 @@ export default function SearchDemo() {
               <div className="flex items-center gap-3">
                 <div
                   className={`w-3 h-3 rounded-full ${
-                    optimized.cached === true ? "bg-green-500" : "bg-blue-500"
+                    isCached ? "bg-green-500" : "bg-blue-500"
                   }`}
                 ></div>
                 <span className="font-medium text-gray-900">
-                  {optimized.cached === true
-                    ? "✓ Served from cache"
-                    : "Fresh LLM response"}
+                  {isCached ? "✓ Served from cache" : "Fresh LLM response"}
                 </span>
               </div>
             </div>
@@ -195,7 +214,7 @@ export default function SearchDemo() {
                           {hotel.name || hotel.title || `Hotel ${idx + 1}`}
                         </span>
                         <span className="text-indigo-600 font-semibold">
-                          ${hotel.price || hotel.rate || "N/A"}
+                          {formatCurrency(hotel.price || hotel.rate || 0, hotel.currency || "INR")}
                         </span>
                       </div>
                     ))
@@ -259,7 +278,7 @@ export default function SearchDemo() {
                       </td>
                       <td className="text-center py-3 px-4 text-gray-700">—</td>
                       <td className="text-center py-3 px-4 text-indigo-600 font-semibold">
-                        {optimized.cached === true ? "Yes" : "No"}
+                        {isCached ? "Yes" : "No"}
                       </td>
                     </tr>
                   </tbody>
@@ -283,7 +302,7 @@ export default function SearchDemo() {
                     Latency Improvement
                   </p>
                   <p className="text-3xl font-bold text-blue-600">
-                    {improvement.latencyImprovement}%
+                    {improvement.latencyLabel}
                   </p>
                 </div>
               </div>

@@ -17,14 +17,14 @@ export async function POST(req) {
     messages: [
       {
         role: "system",
-        content: "You are a hotel assistant. Find best hotels from data.",
+        content: "You are a inventory assistant. Find best results from data.",
       },
       {
         role: "user",
         content: `
 User query: ${query}
 
-All hotels:
+All inventory items:
 ${JSON.stringify(hotels)}
         `,
       },
