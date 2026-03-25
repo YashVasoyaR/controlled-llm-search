@@ -9,7 +9,11 @@ const client = new OpenAI({
 export async function POST(req) {
   const { query } = await req.json();
 
-  // 🔥 STEP 1: LLM → Extract filters
+  const startTime = Date.now();
+
+  // 🔥 STEP 1: Query Understanding (LLM)
+  const queryUnderstandingStart = Date.now();
+
   const aiResponse = await client.chat.completions.create({
     model: "openai/gpt-3.5-turbo",
     messages: [
@@ -33,6 +37,8 @@ Return ONLY JSON:
     ],
   });
 
+  const queryUnderstandingLatency = Date.now() - queryUnderstandingStart;
+
   const raw = aiResponse.choices[0].message.content;
 
   let filters;
@@ -43,9 +49,10 @@ Return ONLY JSON:
     return Response.json({ error: "Invalid AI response", raw });
   }
 
-  // 🔥 STEP 2: Backend filtering (REAL LOGIC)
+  // 🔥 STEP 2: Backend Filtering
   const results = hotels.filter((hotel) => {
     if (filters.location && hotel.location !== filters.location) return false;
+
     if (filters.maxPrice && hotel.price > filters.maxPrice) return false;
 
     if (
@@ -58,13 +65,15 @@ Return ONLY JSON:
     return true;
   });
 
-  // 🔥 STEP 3: LLM → Format response (small data)
+  // 🔥 STEP 3: Response Generation (LLM)
+  const responseGenerationStart = Date.now();
+
   const finalResponse = await client.chat.completions.create({
     model: "openai/gpt-3.5-turbo",
     messages: [
       {
         role: "system",
-        content: "Provide a short, helpful response recommending hotels.",
+        content: "Provide a short, helpful hotel recommendation.",
       },
       {
         role: "user",
@@ -78,47 +87,36 @@ ${JSON.stringify(results)}
     ],
   });
 
-  const finalAnswer = finalResponse.choices[0].message.content;
-  const extractUsage = aiResponse.usage || null;
-  const finalUsage = finalResponse.usage || null;
-  // 🔥 Metrics (core differentiator)
-  const fullData = JSON.stringify(hotels);
-  const filteredData = JSON.stringify(results);
+  const responseGenerationLatency = Date.now() - responseGenerationStart;
 
-  console.log("--- OPTIMIZED SEARCH ---", {
-    type: "optimized",
-    query,
-    filters,
-    results,
-    finalAnswer,
-    usage: {
-      extract: extractUsage,
-      final: finalUsage,
-    },
-    metrics: {
-      fullDataSize: fullData.length,
-      filteredDataSize: filteredData.length,
-      reduction: `${Math.round(
-        ((fullData.length - filteredData.length) / fullData.length) * 100,
-      )}%`,
-    },
-  });
+  const finalAnswer = finalResponse.choices[0].message.content;
+
+  const totalLatency = Date.now() - startTime;
+
+  // 🔥 TOKEN USAGE
+  const queryUnderstandingTokens = aiResponse.usage?.total_tokens || 0;
+
+  const responseGenerationTokens = finalResponse.usage?.total_tokens || 0;
+
+  const totalTokens = queryUnderstandingTokens + responseGenerationTokens;
+
   return Response.json({
     type: "optimized",
     query,
     filters,
     results,
     finalAnswer,
+
     usage: {
-      extract: extractUsage,
-      final: finalUsage,
+      queryUnderstandingTokens,
+      responseGenerationTokens,
+      totalTokens,
     },
-    metrics: {
-      fullDataSize: fullData.length,
-      filteredDataSize: filteredData.length,
-      reduction: `${Math.round(
-        ((fullData.length - filteredData.length) / fullData.length) * 100,
-      )}%`,
+
+    latency: {
+      queryUnderstandingMs: queryUnderstandingLatency,
+      responseGenerationMs: responseGenerationLatency,
+      totalMs: totalLatency,
     },
   });
 }
