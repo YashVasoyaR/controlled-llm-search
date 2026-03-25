@@ -6,10 +6,41 @@ const client = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
 });
 
+// 🔥 In-memory cache
+const cache = new Map();
+
 export async function POST(req) {
   const { query } = await req.json();
 
   const startTime = Date.now();
+  const cacheKey = query.toLowerCase().trim();
+
+  // 🔥 STEP 0: Cache Check
+  if (cache.has(cacheKey)) {
+    const cachedData = cache.get(cacheKey);
+
+    const responseTime = Date.now() - startTime;
+
+    return Response.json({
+      ...cachedData,
+      source: "cache",
+      cached: true,
+
+      // ✅ Real latency for THIS request
+      latency: {
+        ...cachedData.latency,
+        totalMs: responseTime,
+        cacheHitMs: responseTime,
+      },
+
+      // ✅ No tokens used on cache hit
+      usage: {
+        ...cachedData.usage,
+        totalTokens: 0,
+        note: "cache hit — no LLM usage",
+      },
+    });
+  }
 
   // 🔥 STEP 1: Query Understanding (LLM)
   const queryUnderstandingStart = Date.now();
@@ -100,7 +131,8 @@ ${JSON.stringify(results)}
 
   const totalTokens = queryUnderstandingTokens + responseGenerationTokens;
 
-  return Response.json({
+  // 🔥 Final response object
+  const responseData = {
     type: "optimized",
     query,
     filters,
@@ -118,5 +150,14 @@ ${JSON.stringify(results)}
       responseGenerationMs: responseGenerationLatency,
       totalMs: totalLatency,
     },
+  };
+
+  // 🔥 STEP 4: Store in cache
+  cache.set(cacheKey, responseData);
+
+  return Response.json({
+    ...responseData,
+    source: "llm",
+    cached: false,
   });
 }
