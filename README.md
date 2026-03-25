@@ -1,36 +1,155 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🚀 AI Search Optimization System (LLM Cost & Latency Reduction)
 
-## Getting Started
+## 📌 Problem
 
-First, run the development server:
+Most LLM applications follow a naive approach:
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Send entire datasets to the model
+- Let the LLM handle filtering and reasoning
+
+This leads to:
+
+- High token usage
+- Increased cost
+- Slow response times
+- Poor scalability
+
+---
+
+## 💡 Solution
+
+This project implements a structured LLM pipeline:
+
+1. **Query Understanding (LLM)**
+   Extract structured filters from natural language
+
+2. **Backend Filtering (Deterministic)**
+   Apply filters to reduce dataset size
+
+3. **Response Generation (LLM)**
+   Generate final output using minimal data
+
+4. **Caching Layer**
+   Avoid repeated LLM calls for identical queries
+
+---
+
+## 🧠 Architecture
+
+```
+User Query
+   ↓
+LLM (Query Understanding)
+   ↓
+Backend Filtering (Reduce Data)
+   ↓
+LLM (Response Generation)
+   ↓
+Cache (Store Result)
+   ↓
+Return Response
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📊 Performance Comparison
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Metric          | Baseline (Full Context) | Optimized System    |
+| --------------- | ----------------------- | ------------------- |
+| Tokens          | 771                     | 227                 |
+| Token Reduction | —                       | ~70%                |
+| Latency         | ~900ms                  | ~600ms              |
+| Cache Hit       | ❌                      | ✅ (~5ms, 0 tokens) |
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## ⚡ Key Improvements
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- 🔻 Reduced LLM token usage by **~70%** using structured filtering
+- ⚡ Improved response latency by **30–40%**
+- 💸 Achieved **~99% cost reduction** for repeated queries via caching
+- 🧩 Separated LLM responsibilities:
+  - understanding vs generation
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- 🎯 Ensured deterministic filtering outside LLM
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🖥️ Demo UI
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+A simple Next.js dashboard visualizes:
+
+- Baseline vs Optimized comparison
+- Token usage and latency
+- Cache behavior (hit vs miss)
+
+### Example:
+
+- First request → LLM used
+- Second request → Served from cache (0 tokens, ~5ms)
+
+![Demo](./app/screenshots/)
+
+---
+
+## 🛠️ Tech Stack
+
+- Next.js (App Router)
+- OpenRouter (LLM access)
+- OpenAI-compatible APIs
+- Tailwind CSS
+- JavaScript (Node.js)
+
+---
+
+## 📂 Project Structure
+
+```
+app/
+ ├── api/
+ │    ├── search/              # Optimized pipeline
+ │    ├── baseline-search/     # Full-context baseline
+ │
+ ├── page.js                  # Demo dashboard UI
+```
+
+---
+
+## 🎯 Key Insight
+
+LLMs should not be used as:
+
+❌ Data processors
+❌ Database replacements
+
+They should be used for:
+
+✅ Understanding user intent
+✅ Generating responses
+
+---
+
+## 🚀 Future Improvements
+
+- Redis-based distributed caching
+- Vector search integration (RAG)
+- Streaming responses
+- Multi-agent orchestration
+
+---
+
+## 🧩 Why This Matters
+
+At scale:
+
+- Inefficient LLM usage = high cost + slow systems
+- Optimized pipelines = scalable AI products
+
+This project demonstrates how to design **efficient, production-ready LLM systems**.
+
+---
+
+## 👤 Author
+
+Yash Vasoya
+Full-Stack Engineer | AI & LLM Applications
