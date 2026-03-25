@@ -43,15 +43,10 @@ Return ONLY JSON:
     return Response.json({ error: "Invalid AI response", raw });
   }
 
-  // 🔥 STEP 2: Backend filtering
+  // 🔥 STEP 2: Backend filtering (REAL LOGIC)
   const results = hotels.filter((hotel) => {
-    if (filters.location && hotel.location !== filters.location) {
-      return false;
-    }
-
-    if (filters.maxPrice && hotel.price > filters.maxPrice) {
-      return false;
-    }
+    if (filters.location && hotel.location !== filters.location) return false;
+    if (filters.maxPrice && hotel.price > filters.maxPrice) return false;
 
     if (
       filters.amenities.length &&
@@ -63,13 +58,13 @@ Return ONLY JSON:
     return true;
   });
 
-  // 🔥 STEP 3: LLM → Format final response (IMPORTANT)
+  // 🔥 STEP 3: LLM → Format response (small data)
   const finalResponse = await client.chat.completions.create({
     model: "openai/gpt-3.5-turbo",
     messages: [
       {
         role: "system",
-        content: "Provide a helpful, short response recommending hotels.",
+        content: "Provide a short, helpful response recommending hotels.",
       },
       {
         role: "user",
@@ -84,23 +79,46 @@ ${JSON.stringify(results)}
   });
 
   const finalAnswer = finalResponse.choices[0].message.content;
-
-  // 🔥 Metrics (your differentiator)
+  const extractUsage = aiResponse.usage || null;
+  const finalUsage = finalResponse.usage || null;
+  // 🔥 Metrics (core differentiator)
   const fullData = JSON.stringify(hotels);
   const filteredData = JSON.stringify(results);
 
-  const fullSize = fullData.length;
-  const filteredSize = filteredData.length;
-
-  return Response.json({
+  console.log("--- OPTIMIZED SEARCH ---", {
+    type: "optimized",
     query,
     filters,
     results,
     finalAnswer,
+    usage: {
+      extract: extractUsage,
+      final: finalUsage,
+    },
     metrics: {
-      fullDataSize: fullSize,
-      filteredDataSize: filteredSize,
-      reduction: `${Math.round(((fullSize - filteredSize) / fullSize) * 100)}%`,
+      fullDataSize: fullData.length,
+      filteredDataSize: filteredData.length,
+      reduction: `${Math.round(
+        ((fullData.length - filteredData.length) / fullData.length) * 100,
+      )}%`,
+    },
+  });
+  return Response.json({
+    type: "optimized",
+    query,
+    filters,
+    results,
+    finalAnswer,
+    usage: {
+      extract: extractUsage,
+      final: finalUsage,
+    },
+    metrics: {
+      fullDataSize: fullData.length,
+      filteredDataSize: filteredData.length,
+      reduction: `${Math.round(
+        ((fullData.length - filteredData.length) / fullData.length) * 100,
+      )}%`,
     },
   });
 }
