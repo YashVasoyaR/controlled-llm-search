@@ -6,43 +6,66 @@ const client = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
 });
 
-// 🔥 In-memory cache
+// 🔥 Cache setup
 const cache = new Map();
+const CACHE_TTL = 1000 * 60 * 5; // 5 minutes
+
+let cacheHits = 0;
+let cacheMisses = 0;
 
 export async function POST(req) {
   const { query } = await req.json();
 
-  const startTime = Date.now();
+  const requestStart = Date.now();
   const cacheKey = query.toLowerCase().trim();
 
-  // 🔥 STEP 0: Cache Check
-  if (cache.has(cacheKey)) {
-    const cachedData = cache.get(cacheKey);
+  // 🔥 Cache Check with TTL
+  const cachedEntry = cache.get(cacheKey);
 
-    const responseTime = Date.now() - startTime;
+  if (cachedEntry) {
+    const isExpired = Date.now() - cachedEntry.timestamp > CACHE_TTL;
 
-    return Response.json({
-      ...cachedData,
-      source: "cache",
-      cached: true,
+    if (!isExpired) {
+      cacheHits++;
 
-      // ✅ Real latency for THIS request
-      latency: {
-        ...cachedData.latency,
-        totalMs: responseTime,
-        cacheHitMs: responseTime,
-      },
+      const responseTime = Date.now() - requestStart;
 
-      // ✅ No tokens used on cache hit
-      usage: {
-        ...cachedData.usage,
-        totalTokens: 0,
-        note: "cache hit — no LLM usage",
-      },
-    });
+      return Response.json({
+        ...cachedEntry.data,
+        source: "cache",
+        cached: true,
+
+        latency: {
+          ...cachedEntry.data.latency,
+          totalMs: responseTime,
+          cacheHitMs: responseTime,
+        },
+
+        usage: {
+          ...cachedEntry.data.usage,
+          totalTokens: 0,
+          note: "cache hit — no LLM usage",
+        },
+
+        cacheStats: {
+          hits: cacheHits,
+          misses: cacheMisses,
+          hitRate: `${Math.round(
+            (cacheHits / (cacheHits + cacheMisses)) * 100 || 0,
+          )}%`,
+        },
+      });
+    } else {
+      cache.delete(cacheKey);
+    }
   }
 
-  // 🔥 STEP 1: Query Understanding (LLM)
+  // 🔥 Cache miss
+  cacheMisses++;
+
+  const startTime = Date.now();
+
+  // STEP 1: Query Understanding
   const queryUnderstandingStart = Date.now();
 
   const aiResponse = await client.chat.completions.create({
@@ -80,7 +103,7 @@ Return ONLY JSON:
     return Response.json({ error: "Invalid AI response", raw });
   }
 
-  // 🔥 STEP 2: Backend Filtering
+  // STEP 2: Filtering
   const results = hotels.filter((hotel) => {
     if (filters.location && hotel.location !== filters.location) return false;
 
@@ -96,7 +119,7 @@ Return ONLY JSON:
     return true;
   });
 
-  // 🔥 STEP 3: Response Generation (LLM)
+  // STEP 3: Response Generation
   const responseGenerationStart = Date.now();
 
   const finalResponse = await client.chat.completions.create({
@@ -124,14 +147,13 @@ ${JSON.stringify(results)}
 
   const totalLatency = Date.now() - startTime;
 
-  // 🔥 TOKEN USAGE
+  // 🔥 Token usage
   const queryUnderstandingTokens = aiResponse.usage?.total_tokens || 0;
 
   const responseGenerationTokens = finalResponse.usage?.total_tokens || 0;
 
   const totalTokens = queryUnderstandingTokens + responseGenerationTokens;
 
-  // 🔥 Final response object
   const responseData = {
     type: "optimized",
     query,
@@ -152,12 +174,23 @@ ${JSON.stringify(results)}
     },
   };
 
-  // 🔥 STEP 4: Store in cache
-  cache.set(cacheKey, responseData);
+  // 🔥 Store with timestamp
+  cache.set(cacheKey, {
+    data: responseData,
+    timestamp: Date.now(),
+  });
 
   return Response.json({
     ...responseData,
     source: "llm",
     cached: false,
+
+    cacheStats: {
+      hits: cacheHits,
+      misses: cacheMisses,
+      hitRate: `${Math.round(
+        (cacheHits / (cacheHits + cacheMisses)) * 100 || 0,
+      )}%`,
+    },
   });
 }
