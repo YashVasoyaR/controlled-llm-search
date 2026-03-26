@@ -1,11 +1,21 @@
-# 🚀 AI Search Optimization System (LLM Cost & Latency Reduction)
+# 🚀 Controlled LLM Search System
+
+## ⚡ What This System Demonstrates
+
+- 🔻 **70–100% reduction in LLM tokens**
+- ⚡ **Up to ~99% latency reduction** using caching (~5ms, 0 tokens)
+- 🧠 LLM used **only for intent extraction**
+- ⚙️ Deterministic filtering & ranking outside LLM
+- 📦 Multi-layer caching to eliminate unnecessary LLM calls
+
+---
 
 ## 📌 Problem
 
-Most LLM applications follow a naive approach:
+Most LLM-based applications follow a naive pattern:
 
-- Send entire datasets to the model
-- Let the LLM handle filtering and reasoning
+- Send full datasets to the LLM
+- Let the model handle filtering and reasoning
 
 This leads to:
 
@@ -18,19 +28,20 @@ This leads to:
 
 ## 💡 Solution
 
-This project implements a structured LLM pipeline:
+This system introduces a **controlled LLM pipeline**:
 
-1. **Query Understanding (LLM)**
-   Extract structured filters from natural language
+1. **Intent Extraction (LLM)**
+   Convert natural language → structured filters
 
-2. **Backend Filtering (Deterministic)**
-   Apply filters to reduce dataset size
+2. **Deterministic Filtering (Backend)**
+   Apply filters without using LLM
 
-3. **Response Generation (LLM)**
-   Generate final output using minimal data
+3. **Ranking Logic**
+   Prioritize relevant results deterministically
 
-4. **Caching Layer**
-   Avoid repeated LLM calls for identical queries
+4. **Multi-layer Caching**
+   - Query cache → skip LLM entirely
+   - Intent cache → reuse filtered results
 
 ---
 
@@ -39,56 +50,49 @@ This project implements a structured LLM pipeline:
 ```
 User Query
    ↓
-LLM (Query Understanding)
+Query Cache (exact match → skip LLM)
+   ↓ (miss)
+LLM (Intent Extraction ONLY)
    ↓
-Backend Filtering (Reduce Data)
-   ↓
-LLM (Response Generation)
-   ↓
-Cache (Store Result)
+Backend Filtering + Ranking (Deterministic)
    ↓
 Return Response
+   ↓
+Store in Cache
 ```
 
 ---
 
-## 📊 Performance Comparison
+## 📊 Performance Impact
 
-| Metric          | Baseline (Full Context) | Optimized System    |
-| --------------- | ----------------------- | ------------------- |
-| Tokens          | 771                     | 227                 |
-| Token Reduction | —                       | ~70%                |
-| Latency         | ~900ms                  | ~600ms              |
-| Cache Hit       | ❌                      | ✅ (~5ms, 0 tokens) |
+| Scenario          | Tokens  | Latency  |
+| ----------------- | ------- | -------- |
+| Standard Approach | 700–900 | ~1500 ms |
+| Optimized System  | 100–200 | ~600 ms  |
+| Cached (repeat)   | 0       | ~5 ms    |
 
----
+### Key Insight
 
-## ⚡ Key Improvements
+Performance gains come from:
 
-- 🔻 Reduced LLM token usage by **~70%** using structured filtering
-- ⚡ Improved response latency by **30–40%**
-- 💸 Achieved **~99% cost reduction** for repeated queries via caching
-- 🧩 Separated LLM responsibilities:
-  - understanding vs generation
-
-- 🎯 Ensured deterministic filtering outside LLM
+- Reducing data sent to the LLM
+- Eliminating LLM calls entirely on cache hits
 
 ---
 
 ## 🖥️ Demo UI
 
-A simple Next.js dashboard visualizes:
+The system provides a **side-by-side comparison**:
 
-- Baseline vs Optimized comparison
-- Token usage and latency
-- Cache behavior (hit vs miss)
+- Standard vs Optimized approach
+- Token usage
+- Latency
+- Cache behavior (instant vs LLM execution)
 
-### Example:
+### Example Flow
 
 - First request → LLM used
-- Second request → Served from cache (0 tokens, ~5ms)
-
-![Demo](./app/screenshots/)
+- Second request → ⚡ instant (0 tokens, ~5ms)
 
 ---
 
@@ -98,7 +102,7 @@ A simple Next.js dashboard visualizes:
 - OpenRouter (LLM access)
 - OpenAI-compatible APIs
 - Tailwind CSS
-- JavaScript (Node.js)
+- Node.js
 
 ---
 
@@ -108,48 +112,38 @@ A simple Next.js dashboard visualizes:
 app/
  ├── api/
  │    ├── search/              # Optimized pipeline
- │    ├── baseline-search/     # Full-context baseline
+ │    ├── baseline-search/     # Standard approach
  │
- ├── page.js                  # Demo dashboard UI
+ ├── page.tsx                 # Demo UI
 ```
 
 ---
 
-## 🎯 Key Insight
+## 🎯 Core Principle
 
-LLMs should not be used as:
+LLMs should be used for:
 
-❌ Data processors
-❌ Database replacements
+- Understanding intent
+- Extracting structured meaning
 
-They should be used for:
+NOT for:
 
-✅ Understanding user intent
-✅ Generating responses
-
----
-
-## 🚀 Future Improvements
-
-- Redis-based distributed caching
-- Vector search integration (RAG)
-- Streaming responses
-- Multi-agent orchestration
+- Filtering datasets
+- Acting as databases
 
 ---
 
-## 🧩 Why This Matters
+## 🧠 Key Takeaway
 
-At scale:
+Efficient LLM systems are not about using more AI —
 
-- Inefficient LLM usage = high cost + slow systems
-- Optimized pipelines = scalable AI products
+They are about:
 
-This project demonstrates how to design **efficient, production-ready LLM systems**.
+> **Using LLMs only where they add value, and removing them everywhere else.**
 
 ---
 
 ## 👤 Author
 
 Yash Vasoya
-Full-Stack Engineer | AI & LLM Applications
+Full-Stack Engineer | AI & LLM Systems

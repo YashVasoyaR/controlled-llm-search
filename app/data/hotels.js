@@ -5,6 +5,7 @@ export const hotels = [
     location: "Goa",
     price: 4500,
     amenities: ["pool", "wifi", "beach"],
+    currency: "INR"
   },
   {
     id: 2,
@@ -12,27 +13,7 @@ export const hotels = [
     location: "Goa",
     price: 2000,
     amenities: ["wifi"],
-  },
-  {
-    id: 3,
-    name: "Luxury Palace",
-    location: "Los Angeles",
-    price: 8000,
-    amenities: ["pool", "spa", "gym"],
-  },
-  {
-    id: 4,
-    name: "Mountain Retreat",
-    location: "Manali",
-    price: 3500,
-    amenities: ["wifi", "heater", "view"],
-  },
-  {
-    id: 5,
-    name: "City Comfort Inn",
-    location: "Mumbai",
-    price: 3000,
-    amenities: ["wifi", "ac", "parking"],
+    currency: "INR"
   },
   {
     id: 6,
@@ -40,6 +21,31 @@ export const hotels = [
     location: "Goa",
     price: 5000,
     amenities: ["pool", "beach", "bar"],
+    currency: "INR"
+  },
+  {
+    id: 3,
+    name: "Luxury Palace",
+    location: "Los Angeles",
+    price: 8000,
+    amenities: ["pool", "spa", "gym"],
+    currency: "USD"
+  },
+  {
+    id: 4,
+    name: "Mountain Retreat",
+    location: "Manali",
+    price: 3500,
+    amenities: ["wifi", "heater", "view"],
+    currency: "INR"
+  },
+  {
+    id: 5,
+    name: "City Comfort Inn",
+    location: "Mumbai",
+    price: 3000,
+    amenities: ["wifi", "ac", "parking"],
+    currency: "INR"
   },
   {
     id: 7,
@@ -47,6 +53,7 @@ export const hotels = [
     location: "Jaisalmer",
     price: 2500,
     amenities: ["breakfast", "parking"],
+    currency: "INR"
   },
   {
     id: 8,
@@ -54,6 +61,7 @@ export const hotels = [
     location: "Jaipur",
     price: 6000,
     amenities: ["pool", "spa", "wifi"],
+    currency: "INR"
   },
   {
     id: 9,
@@ -61,6 +69,7 @@ export const hotels = [
     location: "Kerala",
     price: 5500,
     amenities: ["boat", "wifi", "meals"],
+    currency: "INR"
   },
   {
     id: 10,
@@ -68,6 +77,7 @@ export const hotels = [
     location: "Delhi",
     price: 2800,
     amenities: ["wifi", "shuttle", "ac"],
+    currency: "INR"
   },
   {
     id: 11,
@@ -75,6 +85,7 @@ export const hotels = [
     location: "Ooty",
     price: 3200,
     amenities: ["wifi", "view", "heater"],
+    currency: "INR"
   },
   {
     id: 12,
@@ -82,6 +93,7 @@ export const hotels = [
     location: "Bangalore",
     price: 4000,
     amenities: ["wifi", "gym", "parking"],
+    currency: "INR"
   },
   {
     id: 13,
@@ -89,6 +101,7 @@ export const hotels = [
     location: "Udaipur",
     price: 5200,
     amenities: ["pool", "lake", "restaurant"],
+    currency: "INR"
   },
   {
     id: 14,
@@ -96,6 +109,7 @@ export const hotels = [
     location: "Rishikesh",
     price: 2700,
     amenities: ["wifi", "yoga", "nature"],
+    currency: "INR"
   },
   {
     id: 15,
@@ -103,6 +117,7 @@ export const hotels = [
     location: "Shimla",
     price: 3800,
     amenities: ["heater", "wifi", "view"],
+    currency: "INR"
   },
   {
     id: 16,
@@ -110,6 +125,7 @@ export const hotels = [
     location: "Hyderabad",
     price: 4200,
     amenities: ["wifi", "conference", "parking"],
+    currency: "INR"
   },
   {
     id: 17,
@@ -117,6 +133,7 @@ export const hotels = [
     location: "Pondicherry",
     price: 4600,
     amenities: ["beach", "wifi", "breakfast"],
+    currency: "INR"
   },
   {
     id: 18,
@@ -124,6 +141,7 @@ export const hotels = [
     location: "Varanasi",
     price: 2200,
     amenities: ["wifi", "breakfast"],
+    currency: "INR"
   },
   {
     id: 19,
@@ -131,6 +149,7 @@ export const hotels = [
     location: "Maldives",
     price: 12000,
     amenities: ["pool", "beach", "spa", "villa"],
+    currency: "MVR"
   },
   {
     id: 20,
@@ -138,5 +157,6 @@ export const hotels = [
     location: "Pune",
     price: 1800,
     amenities: ["wifi"],
+    currency: "INR"
   },
 ];
