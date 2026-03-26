@@ -1,10 +1,32 @@
 import { hotels } from "@/app/data/hotels";
 import OpenAI from "openai";
+import { z } from "zod";
+
+const queryCache = new Map();
 
 const client = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: "https://openrouter.ai/api/v1",
 });
+
+const IntentSchema = z.array(
+  z.object({
+    type: z.literal("hotel").default("hotel"),
+    location: z.string().nullable(),
+    maxPrice: z.number().nullable(),
+    amenities: z.array(z.string()).default([]),
+  }),
+);
+
+function safeParseIntent(raw) {
+  try {
+    const clean = raw.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(clean);
+    return IntentSchema.parse(parsed);
+  } catch (err) {
+    return null;
+  }
+}
 
 // 🔥 Memory setup
 const locationMemory = new Map(); // self-learning map
@@ -109,7 +131,10 @@ function getCacheKey(intent) {
 function handleIntent(intent) {
   if (intent.type === "hotel") {
     return hotels.filter((hotel) => {
-      if (intent.location && hotel.location.toLowerCase() !== intent.location)
+      if (
+        intent.location &&
+        !hotel.location.toLowerCase().includes(intent.location)
+      )
         return false;
 
       if (intent.maxPrice && hotel.price > intent.maxPrice) return false;
@@ -132,38 +157,68 @@ function handleIntent(intent) {
 
 // ✅ Ranking
 function rankResults(results, intent) {
-  return results
-    .map((hotel) => {
-      let score = 0;
+  return results.sort((a, b) => {
+    // 🔥 1. Amenity priority (hard signal)
+    if (intent.amenities.length) {
+      const aMatch = intent.amenities.every((am) =>
+        a.amenities.map((x) => x.toLowerCase()).includes(am),
+      );
+      const bMatch = intent.amenities.every((am) =>
+        b.amenities.map((x) => x.toLowerCase()).includes(am),
+      );
 
-      if (intent.maxPrice) {
-        score += intent.maxPrice - hotel.price;
-      }
+      if (aMatch !== bMatch) return bMatch - aMatch;
+    }
 
-      score += hotel.amenities.length * 10;
+    // 🔥 2. Price closeness
+    if (intent.maxPrice) {
+      const aDiff = Math.abs(intent.maxPrice - a.price);
+      const bDiff = Math.abs(intent.maxPrice - b.price);
 
-      return { ...hotel, score };
-    })
-    .sort((a, b) => b.score - a.score);
+      if (aDiff !== bDiff) return aDiff - bDiff;
+    }
+
+    // 🔥 3. Location match (safety)
+    if (intent.location) {
+      const aLoc = a.location.toLowerCase().includes(intent.location);
+      const bLoc = b.location.toLowerCase().includes(intent.location);
+
+      if (aLoc !== bLoc) return bLoc - aLoc;
+    }
+
+    return 0;
+  });
 }
 
-export async function POST(req) {
-  const { query } = await req.json();
+function isEmptyIntent(intent) {
+  return (
+    !intent.location &&
+    !intent.maxPrice &&
+    (!intent.amenities || intent.amenities.length === 0)
+  );
+}
 
-  const requestStart = Date.now();
+async function extractIntentWithRetry(query, maxRetries = 2) {
+  let lastRaw = null;
+  let totalTokens = 0;
 
-  // 🔥 STEP 1: Extract intent (ONLY LLM CALL)
-  const extractStart = Date.now();
+  for (let i = 0; i <= maxRetries; i++) {
 
-  const aiResponse = await client.chat.completions.create({
-    model: "openai/gpt-3.5-turbo",
-    messages: [
-      {
-        role: "system",
-        content: `
-Extract ALL intents from user query.
+    const response = await client.chat.completions.create({
+      model: "openai/gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: `
+Return ONLY valid JSON array.
+No explanation. No markdown.
 
-Return JSON array:
+Rules:
+- Must return at least ONE intent
+- location should be extracted if present
+- amenities should not be empty if mentioned
+
+Format:
 [
   {
     "type": "hotel",
@@ -172,26 +227,142 @@ Return JSON array:
     "amenities": string[]
   }
 ]
-        `,
-      },
-      { role: "user", content: query },
-    ],
-  });
+          `,
+        },
+        { role: "user", content: query },
+      ],
+    });
 
-  const extractLatency = Date.now() - extractStart;
+    totalTokens += response.usage?.total_tokens || 0;
 
-  let intents = [];
+    const raw = response.choices[0].message.content;
 
-  try {
-    const raw = aiResponse.choices[0].message.content;
-    const clean = raw.replace(/```json|```/g, "").trim();
-    intents = JSON.parse(clean);
-  } catch (e) {
-    return Response.json({ error: "Invalid AI response" });
+    lastRaw = raw;
+
+    const parsed = safeParseIntent(raw);
+
+    // 🔥 STRICT semantic validation (THIS WAS MISSING)
+    const isValid =
+      parsed &&
+      Array.isArray(parsed) &&
+      parsed.length > 0 &&
+      parsed.some(
+        (i) =>
+          i.location !== null ||
+          i.maxPrice !== null ||
+          (i.amenities && i.amenities.length > 0),
+      );
+
+    if (isValid) {
+      return {
+        intents: parsed,
+        tokens: totalTokens,
+        retries: i,
+      };
+    }
   }
 
-  // 🔥 STEP 2: Process intents with cache
-  const intentResults = intents.map((intent) => {
+  // 🔥 SMART FALLBACK (never return useless intent)
+  const fallback = fallbackIntentFromQuery(query);
+
+  return {
+    intents: [fallback],
+    tokens: totalTokens,
+    retries: maxRetries,
+    error: "LLM failed → fallback used",
+    raw: lastRaw,
+  };
+}
+
+function fallbackIntentFromQuery(query) {
+  const lower = query.toLowerCase();
+
+  let location = null;
+
+  if (lower.includes("goa")) location = "goa";
+  else if (lower.includes("mumbai")) location = "mumbai";
+  else if (lower.includes("delhi")) location = "delhi";
+  else if (lower.includes("manali")) location = "manali";
+
+  return {
+    type: "hotel",
+    location,
+    maxPrice: null,
+    amenities: [],
+  };
+}
+
+export async function POST(req) {
+  const { query } = await req.json();
+
+  const requestStart = performance.now();
+
+  // 🔥 Normalize query (important)
+  const queryKey = query
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // 🔥 QUERY CACHE (before LLM)
+  const cachedQuery = queryCache.get(queryKey);
+
+  if (cachedQuery && Date.now() - cachedQuery.timestamp < CACHE_TTL) {
+    const cacheLatency = Math.max(3, performance.now() - requestStart);
+    return Response.json({
+      ...cachedQuery.data,
+      cached: true,
+      cache: {
+        type: "query",
+      },
+      usage: {
+        extractTokens: 0,
+        totalTokens: 0,
+      },
+
+      latency: {
+        extractMs: 0,
+        filterMs: 0,
+        totalMs: Math.max(0.1, Math.round(cacheLatency * 10) / 10),
+      },
+    });
+  }
+
+  // 🔥 LLM extraction
+  const extractStart = performance.now();
+
+  const { intents, tokens: extractTokens } =
+    await extractIntentWithRetry(query);
+
+  const extractLatency = performance.now() - extractStart;
+
+  const validIntents = intents.filter((intent) => !isEmptyIntent(intent));
+
+  if (validIntents.length === 0) {
+    return Response.json({
+      query,
+      intents,
+      results: [],
+      finalAnswer:
+        "Could not understand the query. Try something like 'Hotels in Goa under 5000'.",
+      cached: false,
+
+      usage: {
+        extractTokens,
+        totalTokens: extractTokens,
+      },
+
+      latency: {
+        extractMs: Math.round(extractLatency),
+        filterMs: 0,
+        totalMs: Math.round(performance.now() - requestStart),
+      },
+    });
+  }
+
+  let totalFilterLatency = 0;
+  // 🔥 INTENT CACHE + processing
+  const intentResults = validIntents.map((intent) => {
     const normalized = normalizeIntent(intent);
     const cacheKey = getCacheKey(normalized);
 
@@ -203,16 +374,31 @@ Return JSON array:
       return {
         intent,
         cached: true,
-        data: cachedEntry.data,
+        data: cachedEntry.data.results,
+        finalAnswer: cachedEntry.data.finalAnswer,
       };
     }
 
     cacheMisses++;
 
+    const filterStart = performance.now();
+
     let results = handleIntent(normalized);
     results = rankResults(results, normalized);
 
-    // prevent empty cache pollution
+    const filterLatency = performance.now() - filterStart;
+    totalFilterLatency += filterLatency;
+
+    const firstIntent = normalized;
+
+    const finalAnswer =
+      results.length > 0
+        ? `${results.length} matching hotels in ${
+            firstIntent?.location || "selected location"
+          }${firstIntent?.maxPrice ? ` under ${firstIntent.maxPrice}` : ""}.`
+        : `No results found. Try adjusting filters.`;
+
+    // 🔥 store FULL response (important)
     if (results.length > 0) {
       if (cache.size >= MAX_CACHE_SIZE) {
         const firstKey = cache.keys().next().value;
@@ -220,7 +406,10 @@ Return JSON array:
       }
 
       cache.set(cacheKey, {
-        data: results,
+        data: {
+          results,
+          finalAnswer,
+        },
         timestamp: Date.now(),
       });
     }
@@ -229,25 +418,17 @@ Return JSON array:
       intent,
       cached: false,
       data: results,
+      finalAnswer,
     };
   });
 
-  // 🔥 Flatten results
+  // 🔥 Flatten
   const results = intentResults.flatMap((r) => r.data);
 
-  // 🔥 Deterministic response (NO 2nd LLM)
-  const firstIntent = intents[0];
-
   const finalAnswer =
-    results.length > 0
-      ? `Found ${results.length} results in ${firstIntent?.location || "selected location"}${
-          firstIntent?.maxPrice ? ` under ${firstIntent.maxPrice}` : ""
-        }.`
-      : `No results found. Try adjusting filters.`;
+    intentResults[0]?.finalAnswer || "No results found. Try adjusting filters.";
 
-  // 🔥 Metrics
-  const totalLatency = Date.now() - requestStart;
-  const extractTokens = aiResponse.usage?.total_tokens || 0;
+  const totalLatency = performance.now() - requestStart;
 
   const totalRequests = cacheHits + cacheMisses;
   const hitRate =
@@ -255,12 +436,15 @@ Return JSON array:
 
   const isCached = intentResults.some((r) => r.cached);
 
-  return Response.json({
+  const responsePayload = {
     query,
     intents,
     results,
     finalAnswer,
     cached: isCached,
+    cache: {
+      type: cachedQuery ? "query" : isCached ? "intent" : "none",
+    },
 
     usage: {
       extractTokens,
@@ -268,8 +452,9 @@ Return JSON array:
     },
 
     latency: {
-      extractMs: extractLatency,
-      totalMs: totalLatency,
+      extractMs: Math.round(extractLatency),
+      filterMs: Math.max(0.1, Math.round(totalFilterLatency * 10) / 10),
+      totalMs: Math.round(totalLatency),
     },
 
     cacheStats: {
@@ -277,5 +462,19 @@ Return JSON array:
       misses: cacheMisses,
       hitRate: `${hitRate}%`,
     },
+
+    meta: {
+      totalItems: hotels.length,
+      filteredItems: results.length,
+      sentToLLM: 0,
+    },
+  };
+
+  // 🔥 STORE in query cache (after full processing)
+  queryCache.set(queryKey, {
+    data: responsePayload,
+    timestamp: Date.now(),
   });
+
+  return Response.json(responsePayload);
 }

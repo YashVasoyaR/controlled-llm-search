@@ -49,5 +49,10 @@ ${JSON.stringify(hotels)}
     latency: {
       totalMs: latency,
     },
+
+    meta: {
+      totalItems: hotels.length,
+      sentToLLM: hotels.length,
+    },
   });
 }

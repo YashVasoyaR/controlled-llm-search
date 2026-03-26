@@ -11,6 +11,8 @@ interface UsageData {
 
 interface LatencyData {
   totalMs?: number;
+  extractMs?: number;
+  filterMs?: number;
   fullContextProcessingMs?: number;
   queryUnderstandingMs?: number;
   responseGenerationMs?: number;
@@ -30,9 +32,17 @@ interface ApiResponse {
   usage: UsageData;
   latency: LatencyData;
   cached?: boolean;
+  cache?: {
+    type: "query" | "intent" | "none";
+  };
   filters?: Record<string, unknown>;
   type?: string;
   source?: string;
+  meta?: {
+    totalItems?: number;
+    filteredItems?: number;
+    sentToLLM?: number;
+  };
 }
 
 export default function SearchDemo() {
@@ -43,13 +53,14 @@ export default function SearchDemo() {
   const [error, setError] = useState<string | null>(null);
 
   const isCached = optimized?.cached === true;
+  const cacheType = optimized?.cache?.type || "none";
 
   const formatCurrency = (amount: number, currency = "INR") => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency,
     }).format(amount);
-  }
+  };
   const handleSearch = async () => {
     if (!query.trim()) {
       setError("Please enter a search query");
@@ -134,10 +145,10 @@ export default function SearchDemo() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            AI Search Optimization Demo
+            Controlled LLM Search System
           </h1>
           <p className="text-gray-600">
-            Compare optimized vs baseline search performance
+            Reducing token usage and latency with deterministic architecture
           </p>
         </div>
 
@@ -158,7 +169,7 @@ export default function SearchDemo() {
               disabled={loading}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium cursor-pointer"
             >
-              {loading ? "Searching..." : "Search"}
+              {loading ? "Searching..." : "Run Comparison"}
             </button>
           </div>
           {error && (
@@ -180,7 +191,9 @@ export default function SearchDemo() {
                   }`}
                 ></div>
                 <span className="font-medium text-gray-900">
-                  {isCached ? "✓ Served from cache" : "Fresh LLM response"}
+                  {isCached
+                    ? "⚡ Instant response (LLM skipped via cache)"
+                    : "Fresh LLM response"}
                 </span>
               </div>
             </div>
@@ -214,7 +227,10 @@ export default function SearchDemo() {
                           {hotel.name || hotel.title || `Hotel ${idx + 1}`}
                         </span>
                         <span className="text-indigo-600 font-semibold">
-                          {formatCurrency(hotel.price || hotel.rate || 0, hotel.currency || "INR")}
+                          {formatCurrency(
+                            hotel.price || hotel.rate || 0,
+                            hotel.currency || "INR",
+                          )}
                         </span>
                       </div>
                     ))
@@ -225,8 +241,119 @@ export default function SearchDemo() {
               </div>
             </div>
 
+            {/* Performance Comparison (Card Layout) */}
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold text-gray-900">
+                Performance Comparison
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* ❌ Baseline Card */}
+                <div className="bg-white rounded-lg border border-red-200 p-6">
+                  <h3 className="text-lg font-semibold text-red-600 mb-4">
+                    ❌ Standard Approach
+                  </h3>
+
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Tokens</span>
+                      <span className="font-semibold text-gray-900">
+                        {baseline.usage?.fullContextProcessingTokens ||
+                          baseline.usage?.totalTokens ||
+                          0}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Latency</span>
+                      <span className="font-semibold text-gray-900">
+                        {baseline.latency?.totalMs || 0} ms
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Data to LLM</span>
+                      <span className="font-semibold text-gray-900">
+                        {baseline.meta?.sentToLLM ?? 0} items
+                      </span>
+                    </div>
+
+                    <div className="pt-3 border-t border-gray-200">
+                      <p className="text-xs text-gray-500">
+                        Sends full dataset to LLM
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ✅ Optimized Card */}
+                <div className="bg-white rounded-lg border border-green-200 p-6">
+                  <h3 className="text-lg font-semibold text-green-600 mb-4">
+                    ✅ Optimized System
+                  </h3>
+
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Tokens</span>
+                      <span className="font-semibold text-indigo-600">
+                        {optimized.usage?.totalTokens || 0}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Latency</span>
+                      <span className="font-semibold text-indigo-600">
+                        {optimized.latency?.totalMs || 0} ms
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Data to LLM</span>
+                      <span className="font-semibold text-indigo-600">
+                        {cacheType === "query"
+                          ? 0
+                          : (optimized.meta?.filteredItems ?? 0)}{" "}
+                        items
+                      </span>
+                    </div>
+
+                    <div className="pt-3 border-t border-gray-200">
+                      <p className="text-xs text-gray-500">
+                        {cacheType === "query"
+                          ? "LLM skipped via cache"
+                          : "Filtered data sent to LLM"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 🔥 Impact Summary (moved up) */}
+              {improvement && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-5 text-center">
+                    <p className="text-green-700 text-sm font-medium">
+                      Tokens Reduced
+                    </p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {improvement.tokenReduction}%
+                    </p>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 text-center">
+                    <p className="text-blue-700 text-sm font-medium">
+                      Faster Response
+                    </p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {improvement.latencyLabel}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Comparison Table */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            {/* <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">
                 Performance Comparison
               </h2>
@@ -248,6 +375,17 @@ export default function SearchDemo() {
                   <tbody>
                     <tr className="border-b border-gray-200 hover:bg-gray-50">
                       <td className="py-3 px-4 text-gray-900 font-medium">
+                        Data sent to LLM
+                      </td>
+                      <td className="text-center py-3 px-4 text-gray-700">
+                        {baseline.meta?.sentToLLM ?? 0} items
+                      </td>
+                      <td className="text-center py-3 px-4 text-indigo-600 font-semibold">
+                        {optimized.meta?.filteredItems ?? 0} items
+                      </td>
+                    </tr>
+                    <tr className="border-b border-gray-200 hover:bg-gray-50">
+                      <td className="py-3 px-4 text-gray-900 font-medium">
                         Tokens
                       </td>
                       <td className="text-center py-3 px-4 text-gray-700">
@@ -261,15 +399,35 @@ export default function SearchDemo() {
                     </tr>
                     <tr className="border-b border-gray-200 hover:bg-gray-50">
                       <td className="py-3 px-4 text-gray-900 font-medium">
-                        Latency (ms)
+                        LLM Extraction:
                       </td>
                       <td className="text-center py-3 px-4 text-gray-700">
-                        {baseline.latency?.fullContextProcessingMs ||
-                          baseline.latency?.totalMs ||
-                          0}
+                        {baseline.latency?.totalMs || 0} ms
                       </td>
                       <td className="text-center py-3 px-4 text-indigo-600 font-semibold">
-                        {optimized.latency?.totalMs || 0}
+                        {optimized.latency?.extractMs || 0} ms
+                      </td>
+                    </tr>
+                    <tr className="border-b border-gray-200 hover:bg-gray-50">
+                      <td className="py-3 px-4 text-gray-900 font-medium">
+                        Filtering:
+                      </td>
+                      <td className="text-center py-3 px-4 text-gray-700">
+                        {baseline.latency?.filterMs || 0} ms
+                      </td>
+                      <td className="text-center py-3 px-4 text-indigo-600 font-semibold">
+                        {optimized.latency?.filterMs || 0} ms
+                      </td>
+                    </tr>
+                    <tr className="border-b border-gray-200 hover:bg-gray-50">
+                      <td className="py-3 px-4 text-gray-900 font-medium">
+                        Total
+                      </td>
+                      <td className="text-center py-3 px-4 text-gray-700">
+                        {baseline.latency?.totalMs || 0} ms
+                      </td>
+                      <td className="text-center py-3 px-4 text-indigo-600 font-semibold">
+                        {optimized.latency?.totalMs || 0} ms
                       </td>
                     </tr>
                     <tr className="hover:bg-gray-50">
@@ -278,35 +436,15 @@ export default function SearchDemo() {
                       </td>
                       <td className="text-center py-3 px-4 text-gray-700">—</td>
                       <td className="text-center py-3 px-4 text-indigo-600 font-semibold">
-                        {isCached ? "Yes" : "No"}
+                        {cacheType === "query" && "⚡ Instant (LLM skipped)"}
+                        {cacheType === "intent" && "🧠 Optimized (LLM used)"}
+                        {cacheType === "none" && "Fresh LLM execution"}
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-            </div>
-
-            {/* Improvements */}
-            {improvement && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-linear-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6">
-                  <p className="text-green-700 text-sm font-medium mb-1">
-                    Token Reduction
-                  </p>
-                  <p className="text-3xl font-bold text-green-600">
-                    {improvement.tokenReduction}%
-                  </p>
-                </div>
-                <div className="bg-linear-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-lg p-6">
-                  <p className="text-blue-700 text-sm font-medium mb-1">
-                    Latency Improvement
-                  </p>
-                  <p className="text-3xl font-bold text-blue-600">
-                    {improvement.latencyLabel}
-                  </p>
-                </div>
-              </div>
-            )}
+            </div> */}
           </div>
         )}
 
