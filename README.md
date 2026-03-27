@@ -133,13 +133,27 @@ NOT for:
 
 ---
 
-## 🧠 Key Takeaway
+## 🧠 Engineering Decisions
 
-Efficient LLM systems are not about using more AI —
+- LLM is used only for intent extraction  
+  → avoids unnecessary token usage  
 
-They are about:
+- Filtering is moved to backend  
+  → reduces data sent to LLM  
 
-> **Using LLMs only where they add value, and removing them everywhere else.**
+- Query-level caching is added  
+  → eliminates LLM calls for repeated queries  
+
+- Deterministic logic replaces LLM where possible  
+  → improves reliability and predictability  
+
+---
+
+⚖️ Tradeoffs
+
+- Additional backend complexity vs lower LLM cost  
+- Small extraction overhead vs faster overall response  
+- Deterministic logic vs flexibility of full LLM reasoning  
 
 ---
 
