@@ -49,7 +49,7 @@ async function extractIntentWithRetry(
 
   for (let i = 0; i <= maxRetries; i++) {
     const response = await client.chat.completions.create({
-      model: "openai/gpt-3.5-turbo",
+      model: process.env.OPENROUTER_MODEL as string,
       messages: [
         {
           role: "system",

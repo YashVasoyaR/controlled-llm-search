@@ -1,7 +1,71 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ComparisonApiResponse } from "@/types/comparison";
+
+function LatencyInfoIcon({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [text]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (wrapRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative inline-flex shrink-0" ref={wrapRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="rounded-full p-1 text-gray-500 transition-colors hover:bg-gray-200/80 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+        aria-expanded={open}
+        aria-controls="latency-info-popover"
+        aria-label="Why this latency result"
+      >
+        <svg
+          className="h-5 w-5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 16v-4" />
+          <path d="M12 8h.01" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          id="latency-info-popover"
+          role="region"
+          aria-label="Latency explanation"
+          className="absolute left-1/2 top-full z-30 mt-2 w-[min(18rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-gray-200 bg-white p-3 text-left text-xs leading-snug text-gray-700 shadow-lg ring-1 ring-black/5"
+        >
+          {text}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function SearchDemo() {
   const [query, setQuery] = useState("");
@@ -80,19 +144,51 @@ export default function SearchDemo() {
       baseline.latency?.totalMs ||
       0;
     const optimizedLatency = optimized.latency?.totalMs || 0;
-    let latencyImprovement = 0;
+    const latencyDiff = optimizedLatency - baselineLatency;
 
-    if (baselineLatency) {
-      latencyImprovement =
-        ((baselineLatency - optimizedLatency) / baselineLatency) * 100;
+    let latencyLabel = "";
+    let latencyColor = "";
+    let latencyType: "faster" | "slower" | "same" | "na" = "na";
+
+    if (baselineLatency === 0) {
+      latencyLabel = "N/A";
+      latencyColor = "text-gray-600";
+      latencyType = "na";
+    } else {
+      const percent = Math.abs(
+        (latencyDiff / baselineLatency) * 100,
+      ).toFixed(1);
+
+      if (latencyDiff < 0) {
+        latencyType = "faster";
+        latencyLabel = `${percent}% faster`;
+        latencyColor = "text-green-600";
+      } else if (latencyDiff > 0) {
+        latencyType = "slower";
+        latencyLabel = `${percent}% slower`;
+        latencyColor = "text-red-600";
+      } else {
+        latencyType = "same";
+        latencyLabel = "No change";
+        latencyColor = "text-gray-600";
+      }
     }
 
-    const latencyLabel =
-      latencyImprovement >= 0
-        ? `${latencyImprovement.toFixed(1)}% faster`
-        : `${Math.abs(latencyImprovement).toFixed(1)}% slower`;
+    let latencyReason = "";
 
-    return { tokenReduction, latencyImprovement, latencyLabel };
+    if (latencyType === "slower") {
+      if (optimizedTokens === 0) {
+        latencyReason =
+          "Cache hit: latency is minimal but baseline comparison includes full LLM execution.";
+      } else {
+        latencyReason =
+          "Includes LLM intent extraction step. Using slower/free model may increase latency.";
+      }
+    } else if (latencyType === "faster") {
+      latencyReason = "Reduced data sent to LLM improves response time.";
+    }
+
+    return { tokenReduction, latencyLabel, latencyColor, latencyType, latencyReason };
   };
 
   const improvement = calculateImprovement();
@@ -299,13 +395,23 @@ export default function SearchDemo() {
                     </p>
                   </div>
 
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 text-center">
-                    <p className="text-blue-700 text-sm font-medium">
-                      Faster Response
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 text-center">
+                    <p className="text-gray-700 text-sm font-medium">
+                      Latency Change
                     </p>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {improvement.latencyLabel}
-                    </p>
+                    <div className="relative flex w-full min-w-0 items-center justify-center gap-2">
+                      <p
+                        className={`min-w-0 text-2xl font-bold ${improvement.latencyColor}`}
+                      >
+                        {improvement.latencyType === "faster" && "⚡ "}
+                        {improvement.latencyType === "slower" && "⚠️ "}
+                        {improvement.latencyType === "same" && "➖ "}
+                        {improvement.latencyLabel}
+                      </p>
+                      {improvement.latencyReason && (
+                        <LatencyInfoIcon text={improvement.latencyReason} />
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

@@ -15,7 +15,7 @@ export async function POST(req: Request): Promise<Response> {
 
   // ❌ Baseline: Full context sent to LLM
   const baselineResponse = await client.chat.completions.create({
-    model: "openai/gpt-3.5-turbo",
+    model: process.env.OPENROUTER_MODEL as string,
     messages: [
       {
         role: "system",
