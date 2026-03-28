@@ -1,55 +1,13 @@
 "use client";
 
 import { useState } from "react";
-
-interface UsageData {
-  totalTokens?: number;
-  fullContextProcessingTokens?: number;
-  queryUnderstandingTokens?: number;
-  responseGenerationTokens?: number;
-}
-
-interface LatencyData {
-  totalMs?: number;
-  extractMs?: number;
-  filterMs?: number;
-  fullContextProcessingMs?: number;
-  queryUnderstandingMs?: number;
-  responseGenerationMs?: number;
-  cacheHitMs?: number;
-}
-
-interface ApiResponse {
-  query: string;
-  finalAnswer: string;
-  results?: Array<{
-    name?: string;
-    title?: string;
-    price?: number;
-    rate?: number;
-    currency?: string;
-  }>;
-  usage: UsageData;
-  latency: LatencyData;
-  cached?: boolean;
-  cache?: {
-    type: "query" | "intent" | "none";
-  };
-  filters?: Record<string, unknown>;
-  type?: string;
-  source?: string;
-  meta?: {
-    totalItems?: number;
-    filteredItems?: number;
-    sentToLLM?: number;
-  };
-}
+import type { ComparisonApiResponse } from "@/types/comparison";
 
 export default function SearchDemo() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
-  const [optimized, setOptimized] = useState<ApiResponse | null>(null);
-  const [baseline, setBaseline] = useState<ApiResponse | null>(null);
+  const [optimized, setOptimized] = useState<ComparisonApiResponse | null>(null);
+  const [baseline, setBaseline] = useState<ComparisonApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const isCached = optimized?.cached === true;
@@ -89,8 +47,8 @@ export default function SearchDemo() {
         throw new Error("API request failed");
       }
 
-      const optimizedData: ApiResponse = await optimizedRes.json();
-      const baselineData: ApiResponse = await baselineRes.json();
+      const optimizedData: ComparisonApiResponse = await optimizedRes.json();
+      const baselineData: ComparisonApiResponse = await baselineRes.json();
 
       setOptimized(optimizedData);
       setBaseline(baselineData);
@@ -154,20 +112,21 @@ export default function SearchDemo() {
 
         {/* Search Input Section */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !loading && handleSearch()}
               placeholder="Hotels in Goa under 5000 with pool"
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-zinc-800 placeholder:text-zinc-400"
+              className="min-w-0 w-full flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-zinc-800 placeholder:text-zinc-400"
               disabled={loading}
             />
             <button
+              type="button"
               onClick={handleSearch}
               disabled={loading}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium cursor-pointer"
+              className="w-full shrink-0 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium cursor-pointer sm:w-auto whitespace-nowrap"
             >
               {loading ? "Searching..." : "Run Comparison"}
             </button>

@@ -1,13 +1,15 @@
 import { hotels } from "@/app/data/hotels";
 import OpenAI from "openai";
+import type { BaselineResponse } from "@/types/baseline";
 
 const client = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: "https://openrouter.ai/api/v1",
 });
 
-export async function POST(req) {
-  const { query } = await req.json();
+export async function POST(req: Request): Promise<Response> {
+  const body = await req.json() as { query: string };
+  const { query } = body;
 
   const startTime = Date.now();
 
@@ -37,7 +39,7 @@ ${JSON.stringify(hotels)}
 
   const totalTokens = baselineResponse.usage?.total_tokens || 0;
 
-  return Response.json({
+  const payload: BaselineResponse = {
     type: "baseline",
     query,
     finalAnswer,
@@ -54,5 +56,7 @@ ${JSON.stringify(hotels)}
       totalItems: hotels.length,
       sentToLLM: hotels.length,
     },
-  });
+  };
+
+  return Response.json(payload);
 }
