@@ -27,6 +27,7 @@ export interface ComparisonHotelPreview {
 
 export interface ComparisonApiResponse {
   query: string;
+  model: string;
   finalAnswer: string;
   results?: ComparisonHotelPreview[];
   usage: ComparisonUsageData;

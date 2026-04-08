@@ -46,7 +46,7 @@ async function extractIntentWithRetry(
 ): Promise<ExtractIntentResult> {
   let lastRaw: string | null = null;
   let totalTokens: number = 0;
-
+  let model: string = process.env.OPENROUTER_MODEL ?? "";
   for (let i = 0; i <= maxRetries; i++) {
     const response = await client.chat.completions.create({
       model: process.env.OPENROUTER_MODEL as string,
@@ -78,7 +78,7 @@ Format:
     });
 
     totalTokens += response.usage?.total_tokens || 0;
-
+    model = response.model ?? model;
     const raw = response.choices[0]?.message?.content;
     if (!raw) continue;
 
@@ -103,6 +103,7 @@ Format:
         intents: parsed,
         tokens: totalTokens,
         retries: i,
+        model,
       };
     }
   }
@@ -116,6 +117,7 @@ Format:
     retries: maxRetries,
     error: "LLM failed → fallback used",
     raw: lastRaw,
+    model: model ?? "",
   };
 }
 

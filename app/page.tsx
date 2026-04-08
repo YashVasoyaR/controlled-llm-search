@@ -108,7 +108,7 @@ export default function SearchDemo() {
       ]);
 
       if (!optimizedRes.ok || !baselineRes.ok) {
-        throw new Error("API request failed");
+        throw new Error("LLM execution is currently disabled in this public demo.");
       }
 
       const optimizedData: ComparisonApiResponse = await optimizedRes.json();
@@ -310,6 +310,12 @@ export default function SearchDemo() {
                   </h3>
 
                   <div className="space-y-3 text-sm">
+                    <div className={`justify-between ${process.env.NEXT_PUBLIC_SHOW_MODEL === "true" ? "flex" : "hidden"}`}>
+                      <span className="text-gray-600">Model</span>
+                      <span className="font-semibold text-gray-900">
+                        {baseline.model}
+                      </span>
+                    </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Tokens</span>
                       <span className="font-semibold text-gray-900">
@@ -348,6 +354,12 @@ export default function SearchDemo() {
                   </h3>
 
                   <div className="space-y-3 text-sm">
+                    <div className={`justify-between ${process.env.NEXT_PUBLIC_SHOW_MODEL === "true" ? "flex" : "hidden"}`}>
+                      <span className="text-gray-600">Model</span>
+                      <span className="font-semibold text-gray-900">
+                        {optimized.model}
+                      </span>
+                    </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Tokens</span>
                       <span className="font-semibold text-indigo-600">

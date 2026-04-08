@@ -32,15 +32,17 @@ ${JSON.stringify(hotels)}
       },
     ],
   });
-
+console.log("baselineResponse", baselineResponse);
   const latency = Date.now() - startTime;
 
   const finalAnswer = baselineResponse.choices[0].message.content;
 
   const totalTokens = baselineResponse.usage?.total_tokens || 0;
 
+  const model = baselineResponse.model ?? process.env.OPENROUTER_MODEL ?? "";
   const payload: BaselineResponse = {
     type: "baseline",
+    model,
     query,
     finalAnswer,
 

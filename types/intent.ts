@@ -17,4 +17,5 @@ export interface ExtractIntentResult {
   retries: number;
   error?: string;
   raw?: string | null;
+  model: string;
 }

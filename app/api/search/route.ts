@@ -50,7 +50,7 @@ export async function POST(req: Request): Promise<Response> {
   const extractStart = performance.now();
 
   const extractionResult: ExtractIntentResult = await extractIntent(query);
-  const { intents, tokens: extractTokens } = extractionResult;
+  const { intents, tokens: extractTokens, model } = extractionResult;
 
   const extractLatency = performance.now() - extractStart;
 
@@ -63,6 +63,7 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({
       query,
       intents,
+      model,
       results: [],
       finalAnswer:
         "Could not understand the query. Try something like 'Hotels in Goa under 5000'.",
@@ -163,6 +164,7 @@ export async function POST(req: Request): Promise<Response> {
     query,
     intents,
     results,
+    model,
     finalAnswer,
     cached: isCached,
     cache: {

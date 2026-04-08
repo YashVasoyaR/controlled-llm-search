@@ -1,5 +1,6 @@
 export interface BaselineResponse {
   type: "baseline";
+  model: string;
   query: string;
   finalAnswer: string | null;
   usage: {

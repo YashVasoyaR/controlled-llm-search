@@ -27,6 +27,7 @@ export interface SearchResponse {
   query: string;
   intents: Intent[];
   results: Hotel[];
+  model: string;
   finalAnswer: string;
   cached: boolean;
   cache: SearchResponseCache;
